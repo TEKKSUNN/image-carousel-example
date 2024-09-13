@@ -1,7 +1,7 @@
 {
-  "name": "template",
+  "name": "image-carousel-example",
   "version": "1.0.0",
-  "description": "A template repository that is the usual structure of my code when using node. I just want to import it every time when making a new repo.",
+  "description": "An example website for my image-carousel npm package.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,7 +9,7 @@
     "dev": "webpack serve --config webpack.dev.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "TEKKSUNN <emmanuelleutecson@gmail.com>",
   "license": "ISC",
   "devDependencies": {
     "css-loader": "^7.1.2",
