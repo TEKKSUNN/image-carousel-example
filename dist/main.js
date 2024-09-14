@@ -17,7 +17,7 @@ const getWidth = (element) => element.offsetWidth;
 
 const getLeft = (element) => parseFloat(getProperty(element, "left").slice(0, -2));
 
-const changeLeft = (element, newNum) => { element.style.left = newNum };
+const changeLeft = (element, newNum) => { console.log(element); element.style.left = newNum };
 
 const exceedsUpward = (number, coreNumber) => number <= -coreNumber;
 
@@ -45,36 +45,26 @@ const subLeft = (element) => {
     return newLeft;
 };
 
-const getNumPictures = (pictures) => Math.floor(pictures.childNodes.length / 2);
-
-const getCurrentImgNum = (pictureFrame) => parseInt(pictureFrame.lastChild.textContent);
-
-const getImgNum = (pictureFrame) => pictureFrame.lastChild;
-
-const changeImgNum = (pictureFrame, newNum) => { getImgNum(pictureFrame).textContent = `${newNum}` };
-
-function addImageNum(pictureFrame, pictures) {
-    const numPictures = getNumPictures(pictures);
-    const currentNum = getCurrentImgNum(pictureFrame);
-    const newNum = currentNum + 1;
-    if (newNum > numPictures) {
-        return 1;
-    }
-    return newNum;
-}
-
-function subImageNum(pictureFrame, pictures) {
-    const numPictures = getNumPictures(pictures);
-    const currentNum = getCurrentImgNum(pictureFrame);
-    const newNum = currentNum - 1;
-    if (newNum < 1) {
-        return numPictures;
-    }
-    return newNum;
-}
-
 function getPictures(pictureFrame) {
     return pictureFrame.childNodes[1];
+}
+
+function getPicturesOnly(pictures) {
+    return Array.from(pictures.childNodes)
+        .filter((element) => element.nodeName === "IMG");
+}
+
+function getIndexFromLeft(pictures) {
+    const curLeftVal = getLeft(pictures);
+    const pictureWidth = getWidth(pictures.childNodes[1]);
+    const index = Math.abs(curLeftVal) / pictureWidth;
+    return index;
+}
+
+function updateCircles(pictures, pictureFrame) {
+    const circleNodes = Array.from(pictureFrame.lastChild.childNodes);
+    const activeCircleIndex = getIndexFromLeft(pictures);
+    activateCircle(activeCircleIndex, circleNodes);
 }
 
 function next(pictureFrame) {
@@ -83,9 +73,8 @@ function next(pictureFrame) {
         return;
     }
     const newLeft = `${addLeft(pictures)}px`;
-    const newImgNum = addImageNum(pictureFrame, pictures);
     changeLeft(pictures, newLeft);
-    changeImgNum(pictureFrame, newImgNum);
+    updateCircles(pictures, pictureFrame);
 }
 
 function back(pictureFrame) {
@@ -94,9 +83,8 @@ function back(pictureFrame) {
         return;
     }
     const newLeft = `${subLeft(pictures)}px`;
-    const newImgNum = subImageNum(pictureFrame, pictures);
     changeLeft(pictures, newLeft);
-    changeImgNum(pictureFrame, newImgNum);
+    updateCircles(pictures, pictureFrame);
 }
 
 function createButton(className, callbackfn) {
@@ -106,21 +94,74 @@ function createButton(className, callbackfn) {
     return button;
 }
 
-function createText(className, type, content) {
-    const text = document.createElement(type);
-    text.className = `p-frame-asset p-frame-text ${className}`;
-    text.textContent = content;
-    return text;
+function createDiv(className) {
+    const div = document.createElement('div');
+    div.className = `p-frame-asset ${className}`;
+    return div;
+}
+
+function createCircle(callbackfn) {
+    const circle = document.createElement("div");
+    circle.className = `p-frame-circle`;
+    circle.addEventListener('click', callbackfn);
+    return circle;
+}
+
+function calculateLeft(pictures, index) {
+    const pictureWidth = getWidth(pictures.childNodes[1]);
+    const newLeft = -(pictureWidth * index);
+    return `${newLeft}px`;
+}
+
+function defaultCircle(...circleNodes) {
+    circleNodes.forEach((circle) => {
+        circle.classList.remove('active-circle');
+    })
+}
+
+function activateCircle(index, circleNodes) {
+    defaultCircle(...circleNodes);
+    circleNodes[index].classList.add('active-circle');
+}
+
+function createCirclesFrom(pictureFrame) {
+    const pictures = getPictures(pictureFrame);
+    const picturesOnly = getPicturesOnly(pictures);
+    const circleNodes = [];
+    picturesOnly.forEach((imgNode, index) => {
+        const left = calculateLeft(pictures, index)
+        const newCircle = createCircle(() => {
+            changeLeft(pictures, left);
+        });
+        if (index === 0) {
+            newCircle.classList.add('active-circle');
+        }
+        circleNodes.push(newCircle);
+    });
+    circleNodes.forEach((circle, index) => {
+        circle.addEventListener('click', () => {
+            activateCircle(index, circleNodes);
+        });
+    });
+    return circleNodes;
+}
+
+function appendTo(parentNode, ...childNodes) {
+    childNodes.forEach((node) => {
+        parentNode.appendChild(node);
+    });
 }
 
 function constructButtons(pictureFrame) {
     const nextButton = createButton('next-btn', () => next(pictureFrame));
     const backButton = createButton('back-btn', () => back(pictureFrame));
-    const imageNumber = createText('image-number', 'p', '1');
+    const imageCircleGroup = createDiv('p-frame-circle-group');
+    const imageCircles = createCirclesFrom(pictureFrame);
+    appendTo(imageCircleGroup, ...imageCircles);
     window.setInterval(() => next(pictureFrame), 5000);
     pictureFrame.appendChild(nextButton);
     pictureFrame.appendChild(backButton);
-    pictureFrame.appendChild(imageNumber);
+    pictureFrame.appendChild(imageCircleGroup);
 }
 
 function makeImageCarouselAll(frameQuery) {
@@ -181,12 +222,13 @@ ___CSS_LOADER_EXPORT___.push([module.id, `:root {
     --tim-p-frame-fs: calc(var(--tim-img-size) / 20);
     --tim-p-frame-fg: #eee;
     --tim-true-center: calc(var(--tim-img-size) / 2);
-    --tim-text-shadow: 2px 2px 5px #00000075;
+    --tim-circle-shadow: 2px 2px 5px #00000075;
     --tim-p-frame-bdr: 10px;
     --tim-p-frame-btn-bg: #ffffff25;
     --tim-p-frame-btn-bg-hov: #ffffff75;
     --tim-space: 5px;
     --tim-p-frame-bd: 2.5px solid black;
+    --tim-circle-size: calc(var(--tim-btn-size) / 3);
 }
 
 div.picture-frame.image-carousel {
@@ -242,16 +284,32 @@ div.picture-frame.image-carousel > div.pictures {
     left: var(--tim-space);
 }
 
-.p-frame-text {
-    color: var(--tim-p-frame-fg);
-    font-size: var(--tim-p-frame-fs);
-    text-shadow: var(--tim-text-shadow);
+.p-frame-circle-group {
+    bottom: var(--tim-space);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    width: var(--tim-img-size);
 }
 
-.image-number {
-    left: var(--tim-true-center);
-    bottom: var(--tim-space);
-}`, "",{"version":3,"sources":["webpack://./node_modules/@tekksunn/image-carousel/src/styles.css"],"names":[],"mappings":"AAAA;IACI,oBAAoB;IACpB,qBAAqB;IACrB,2CAA2C;IAC3C,6DAAuC;IACvC,6DAAuC;IACvC,6EAA6E;IAC7E,gDAAgD;IAChD,sBAAsB;IACtB,gDAAgD;IAChD,wCAAwC;IACxC,uBAAuB;IACvB,+BAA+B;IAC/B,mCAAmC;IACnC,gBAAgB;IAChB,mCAAmC;AACvC;;AAEA;IACI,2BAA2B;IAC3B,0BAA0B;IAC1B,sBAAsB;IACtB,gBAAgB;IAChB,6BAA6B;IAC7B,oCAAoC;IACpC,qCAAqC;IACrC,aAAa;IACb,kBAAkB;AACtB;;AAEA;IACI,2BAA2B;IAC3B,0BAA0B;IAC1B,iBAAiB;AACrB;;AAEA;IACI,aAAa;IACb,kBAAkB;AACtB;;AAEA;IACI,kBAAkB;AACtB;;AAEA;IACI,SAAS;IACT,2BAA2B;IAC3B,0BAA0B;IAC1B,kCAAkC;IAClC,eAAe;IACf,oCAAoC;IACpC,2CAA2C;IAC3C,0BAA0B;AAC9B;;AAEA;IACI,+CAA+C;IAC/C,oCAAoC;AACxC;;AAEA;IACI,2CAA2C;IAC3C,uBAAuB;AAC3B;;AAEA;IACI,2CAA2C;IAC3C,sBAAsB;AAC1B;;AAEA;IACI,4BAA4B;IAC5B,gCAAgC;IAChC,mCAAmC;AACvC;;AAEA;IACI,4BAA4B;IAC5B,wBAAwB;AAC5B","sourcesContent":[":root {\n    --tim-btn-size: 35px;\n    --tim-img-size: 300px;\n    --tim-shadow-normal: 5px 5px 10px #00000025;\n    --tim-next-image-btn: url(\"./next.png\");\n    --tim-back-image-btn: url(\"./back.png\");\n    --tim-center-img: calc((var(--tim-img-size) / 2) - (var(--tim-btn-size) / 2));\n    --tim-p-frame-fs: calc(var(--tim-img-size) / 20);\n    --tim-p-frame-fg: #eee;\n    --tim-true-center: calc(var(--tim-img-size) / 2);\n    --tim-text-shadow: 2px 2px 5px #00000075;\n    --tim-p-frame-bdr: 10px;\n    --tim-p-frame-btn-bg: #ffffff25;\n    --tim-p-frame-btn-bg-hov: #ffffff75;\n    --tim-space: 5px;\n    --tim-p-frame-bd: 2.5px solid black;\n}\n\ndiv.picture-frame.image-carousel {\n    height: var(--tim-img-size);\n    width: var(--tim-img-size);\n    box-sizing: border-box;\n    overflow: hidden;\n    border: var(--tim-p-frame-bd);\n    box-shadow: var(--tim-shadow-normal);\n    border-radius: var(--tim-p-frame-bdr);\n    display: flex;\n    position: relative;\n}\n\ndiv.picture-frame.image-carousel > div.pictures > img.carousel-img {\n    height: var(--tim-img-size);\n    width: var(--tim-img-size);\n    object-fit: cover;\n}\n\ndiv.picture-frame.image-carousel > div.pictures {\n    display: flex;\n    position: relative;\n}\n\n.p-frame-asset {\n    position: absolute;\n}\n\n.p-frame-btn {\n    border: 0;\n    height: var(--tim-btn-size);\n    width: var(--tim-btn-size);\n    border-radius: var(--tim-btn-size);\n    cursor: pointer;\n    background-size: var(--tim-btn-size);\n    background-color: var(--tim-p-frame-btn-bg);\n    top: var(--tim-center-img);\n}\n\n.p-frame-btn:hover {\n    background-color: var(--tim-p-frame-btn-bg-hov);\n    box-shadow: var(--tim-shadow-normal);\n}\n\n.next-btn {\n    background-image: var(--tim-next-image-btn);\n    right: var(--tim-space);\n}\n\n.back-btn {\n    background-image: var(--tim-back-image-btn);\n    left: var(--tim-space);\n}\n\n.p-frame-text {\n    color: var(--tim-p-frame-fg);\n    font-size: var(--tim-p-frame-fs);\n    text-shadow: var(--tim-text-shadow);\n}\n\n.image-number {\n    left: var(--tim-true-center);\n    bottom: var(--tim-space);\n}"],"sourceRoot":""}]);
+.p-frame-circle {
+    height: var(--tim-circle-size);
+    width: var(--tim-circle-size);
+    border-radius: var(--tim-circle-size);
+    background-color: transparent;
+    border: 1px solid black;
+    cursor: pointer;
+    background-color: #ffffff25;
+}
+
+.p-frame-circle.active-circle {
+    background-color: white;
+}
+
+.p-frame-circle:hover {
+    box-shadow: var(--tim-circle-shadow);
+}`, "",{"version":3,"sources":["webpack://./node_modules/@tekksunn/image-carousel/src/styles.css"],"names":[],"mappings":"AAAA;IACI,oBAAoB;IACpB,qBAAqB;IACrB,2CAA2C;IAC3C,6DAAuC;IACvC,6DAAuC;IACvC,6EAA6E;IAC7E,gDAAgD;IAChD,sBAAsB;IACtB,gDAAgD;IAChD,0CAA0C;IAC1C,uBAAuB;IACvB,+BAA+B;IAC/B,mCAAmC;IACnC,gBAAgB;IAChB,mCAAmC;IACnC,gDAAgD;AACpD;;AAEA;IACI,2BAA2B;IAC3B,0BAA0B;IAC1B,sBAAsB;IACtB,gBAAgB;IAChB,6BAA6B;IAC7B,oCAAoC;IACpC,qCAAqC;IACrC,aAAa;IACb,kBAAkB;AACtB;;AAEA;IACI,2BAA2B;IAC3B,0BAA0B;IAC1B,iBAAiB;AACrB;;AAEA;IACI,aAAa;IACb,kBAAkB;AACtB;;AAEA;IACI,kBAAkB;AACtB;;AAEA;IACI,SAAS;IACT,2BAA2B;IAC3B,0BAA0B;IAC1B,kCAAkC;IAClC,eAAe;IACf,oCAAoC;IACpC,2CAA2C;IAC3C,0BAA0B;AAC9B;;AAEA;IACI,+CAA+C;IAC/C,oCAAoC;AACxC;;AAEA;IACI,2CAA2C;IAC3C,uBAAuB;AAC3B;;AAEA;IACI,2CAA2C;IAC3C,sBAAsB;AAC1B;;AAEA;IACI,wBAAwB;IACxB,aAAa;IACb,uBAAuB;IACvB,mBAAmB;IACnB,QAAQ;IACR,0BAA0B;AAC9B;;AAEA;IACI,8BAA8B;IAC9B,6BAA6B;IAC7B,qCAAqC;IACrC,6BAA6B;IAC7B,uBAAuB;IACvB,eAAe;IACf,2BAA2B;AAC/B;;AAEA;IACI,uBAAuB;AAC3B;;AAEA;IACI,oCAAoC;AACxC","sourcesContent":[":root {\n    --tim-btn-size: 35px;\n    --tim-img-size: 300px;\n    --tim-shadow-normal: 5px 5px 10px #00000025;\n    --tim-next-image-btn: url(\"./next.png\");\n    --tim-back-image-btn: url(\"./back.png\");\n    --tim-center-img: calc((var(--tim-img-size) / 2) - (var(--tim-btn-size) / 2));\n    --tim-p-frame-fs: calc(var(--tim-img-size) / 20);\n    --tim-p-frame-fg: #eee;\n    --tim-true-center: calc(var(--tim-img-size) / 2);\n    --tim-circle-shadow: 2px 2px 5px #00000075;\n    --tim-p-frame-bdr: 10px;\n    --tim-p-frame-btn-bg: #ffffff25;\n    --tim-p-frame-btn-bg-hov: #ffffff75;\n    --tim-space: 5px;\n    --tim-p-frame-bd: 2.5px solid black;\n    --tim-circle-size: calc(var(--tim-btn-size) / 3);\n}\n\ndiv.picture-frame.image-carousel {\n    height: var(--tim-img-size);\n    width: var(--tim-img-size);\n    box-sizing: border-box;\n    overflow: hidden;\n    border: var(--tim-p-frame-bd);\n    box-shadow: var(--tim-shadow-normal);\n    border-radius: var(--tim-p-frame-bdr);\n    display: flex;\n    position: relative;\n}\n\ndiv.picture-frame.image-carousel > div.pictures > img.carousel-img {\n    height: var(--tim-img-size);\n    width: var(--tim-img-size);\n    object-fit: cover;\n}\n\ndiv.picture-frame.image-carousel > div.pictures {\n    display: flex;\n    position: relative;\n}\n\n.p-frame-asset {\n    position: absolute;\n}\n\n.p-frame-btn {\n    border: 0;\n    height: var(--tim-btn-size);\n    width: var(--tim-btn-size);\n    border-radius: var(--tim-btn-size);\n    cursor: pointer;\n    background-size: var(--tim-btn-size);\n    background-color: var(--tim-p-frame-btn-bg);\n    top: var(--tim-center-img);\n}\n\n.p-frame-btn:hover {\n    background-color: var(--tim-p-frame-btn-bg-hov);\n    box-shadow: var(--tim-shadow-normal);\n}\n\n.next-btn {\n    background-image: var(--tim-next-image-btn);\n    right: var(--tim-space);\n}\n\n.back-btn {\n    background-image: var(--tim-back-image-btn);\n    left: var(--tim-space);\n}\n\n.p-frame-circle-group {\n    bottom: var(--tim-space);\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    gap: 4px;\n    width: var(--tim-img-size);\n}\n\n.p-frame-circle {\n    height: var(--tim-circle-size);\n    width: var(--tim-circle-size);\n    border-radius: var(--tim-circle-size);\n    background-color: transparent;\n    border: 1px solid black;\n    cursor: pointer;\n    background-color: #ffffff25;\n}\n\n.p-frame-circle.active-circle {\n    background-color: white;\n}\n\n.p-frame-circle:hover {\n    box-shadow: var(--tim-circle-shadow);\n}"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
