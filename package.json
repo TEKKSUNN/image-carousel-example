@@ -21,6 +21,6 @@
     "webpack-dev-server": "^5.0.4"
   },
   "dependencies": {
-    "@tekksunn/image-carousel": "^1.0.3"
+    "@tekksunn/image-carousel": "^1.1.0"
   }
 }
